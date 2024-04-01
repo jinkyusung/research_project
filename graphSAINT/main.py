@@ -13,7 +13,7 @@ from torch_geometric.utils import degree
 if not WITH_TORCH_SPARSE:
     quit("This example requires 'torch-sparse'")
 
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Flickr')
+path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'data', 'Flickr')
 dataset = Flickr(path)
 data = dataset[0]
 row, col = data.edge_index
@@ -24,9 +24,9 @@ parser.add_argument('--use_normalization', action='store_true')
 args = parser.parse_args()
 
 loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=2,
-                                     num_steps=5, sample_coverage=100,
-                                     save_dir=dataset.processed_dir,
-                                     num_workers=4)
+                                     num_steps=5, sample_coverage=100)
+                                     #save_dir=dataset.processed_dir,
+                                     #num_workers=1)
 
 
 class Net(torch.nn.Module):
