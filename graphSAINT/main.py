@@ -13,21 +13,6 @@ from torch_geometric.utils import degree
 if not WITH_TORCH_SPARSE:
     quit("This example requires 'torch-sparse'")
 
-path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'data', 'Flickr')
-dataset = Flickr(path)
-data = dataset[0]
-row, col = data.edge_index
-data.edge_weight = 1. / degree(col, data.num_nodes)[col]  # Norm by in-degree.
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--use_normalization', action='store_true')
-args = parser.parse_args()
-
-loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=2,
-                                     num_steps=5, sample_coverage=100)
-                                     #save_dir=dataset.processed_dir,
-                                     #num_workers=1)
-
 
 class Net(torch.nn.Module):
     def __init__(self, hidden_channels):
@@ -54,12 +39,7 @@ class Net(torch.nn.Module):
         x = torch.cat([x1, x2, x3], dim=-1)
         x = self.lin(x)
         return x.log_softmax(dim=-1)
-
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Net(hidden_channels=256).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
+    
 
 def train():
     model.train()
@@ -101,8 +81,31 @@ def test():
     return accs
 
 
-for epoch in range(1, 51):
-    loss = train()
-    accs = test()
-    print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Train: {accs[0]:.4f}, '
-          f'Val: {accs[1]:.4f}, Test: {accs[2]:.4f}')
+if __name__ == '__main__':
+
+    # Data load
+    path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'data', 'Flickr')
+    dataset = Flickr(path)
+    data = dataset[0]
+    row, col = data.edge_index
+    data.edge_weight = 1. / degree(col, data.num_nodes)[col]  # Norm by in-degree.
+
+    # Args parse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--use_normalization', action='store_true')
+    args = parser.parse_args()
+
+    # RandomWalkSampling
+    loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=2, num_steps=5, sample_coverage=100)
+
+    # Model instance
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Net(hidden_channels=256).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    # Train
+    for epoch in range(1, 51):
+        loss = train()
+        accs = test()
+        print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Train: {accs[0]:.4f},', f'Val: {accs[1]:.4f}, Test: {accs[2]:.4f}')
+    
