@@ -5,20 +5,19 @@ import torch
 import torch.nn.functional as F
 
 from torch_geometric.datasets import Flickr
-from torch_geometric.loader import GraphSAINTRandomWalkSampler
+from torch_geometric.loader import (
+    GraphSAINTRandomWalkSampler, 
+    GraphSAINTSampler,
+    GraphSAINTEdgeSampler,
+    GraphSAINTNodeSampler
+)
 from torch_geometric.nn import GraphConv
-from torch_geometric.typing import WITH_TORCH_SPARSE
 from torch_geometric.utils import degree
-
-if not WITH_TORCH_SPARSE:
-    quit("This example requires 'torch-sparse'")
 
 
 class Net(torch.nn.Module):
-    def __init__(self, hidden_channels):
+    def __init__(self, in_channels, hidden_channels, out_channels):
         super().__init__()
-        in_channels = dataset.num_node_features
-        out_channels = dataset.num_classes
         self.conv1 = GraphConv(in_channels, hidden_channels)
         self.conv2 = GraphConv(hidden_channels, hidden_channels)
         self.conv3 = GraphConv(hidden_channels, hidden_channels)
@@ -41,7 +40,7 @@ class Net(torch.nn.Module):
         return x.log_softmax(dim=-1)
     
 
-def train():
+def train(model, loader, device, args):
     model.train()
     model.set_aggr('add' if args.use_normalization else 'mean')
 
@@ -67,7 +66,7 @@ def train():
 
 
 @torch.no_grad()
-def test():
+def test(model, data):
     model.eval()
     model.set_aggr('mean')
 
@@ -95,17 +94,23 @@ if __name__ == '__main__':
     parser.add_argument('--use_normalization', action='store_true')
     args = parser.parse_args()
 
-    # RandomWalkSampling
-    loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=2, num_steps=5, sample_coverage=100)
+    # Sampler choice
+    loader = GraphSAINTNodeSampler(data, batch_size=6000, num_steps=5, sample_coverage=100)
+    # loader = GraphSAINTEdgeSampler(data, batch_size=6000, num_steps=5, sample_coverage=100)
+    # loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=2, num_steps=5, sample_coverage=100)
 
     # Model instance
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = Net(hidden_channels=256).to(device)
+    model = Net(
+        in_channels=dataset.num_node_features, 
+        hidden_channels=256, 
+        out_channels=dataset.num_classes
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     # Train
     for epoch in range(1, 51):
-        loss = train()
-        accs = test()
+        loss = train(model, loader, device, args)
+        accs = test(model, data)
         print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Train: {accs[0]:.4f},', f'Val: {accs[1]:.4f}, Test: {accs[2]:.4f}')
     
